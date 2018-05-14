@@ -10,7 +10,7 @@ Center loss implementation for face recognition in pytorch. Paper at: https://yd
 
 ### Requirements
 
-- [ ] Dataset and loader for `LFW` dataset.
+- [x] Dataset and loader for `LFW` dataset.
 - [ ] Training process.
 - [ ] Evaluation process.
 - [ ] Inference process.
