@@ -15,7 +15,7 @@ def get_center_delta(features, centers, targets, alpha):
     target_centers = centers[targets]
     features = features[indices]
 
-    delta_centers = features - target_centers
+    delta_centers = target_centers - features
     uni_targets, indices = torch.unique( targets.cpu(), sorted=True, return_inverse=True )
 
     uni_targets = uni_targets.to(device)
