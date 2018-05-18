@@ -17,14 +17,11 @@ class CenterLossTest(unittest.TestCase):
 
     def test_get_center_delta(self):
         result = get_center_delta(self.features, self.centers, self.targets, self.alpha)
-
         # size should match
         self.assertTrue(result.size() == self.centers.size())
-
         # for class 1
         class1_result = ((self.features[0] + self.features[2]) - 2 * self.centers[1]) / 3 * self.alpha
         self.assertEqual(3, torch.sum(result[1] == class1_result).item())
-
         # for class 3
         class3_result = (self.features[1] - self.centers[3]) / 2 * self.alpha
         self.assertEqual(3, torch.sum(result[3] == class3_result).item())

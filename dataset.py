@@ -7,6 +7,8 @@ from tqdm import tqdm
 import requests
 from torch.utils import data
 
+from utils import image_loader
+
 def download_dataset(dir):
     url = "http://vis-www.cs.umass.edu/lfw/lfw-deepfunneled.tgz"
     download_path = os.path.join(dir, url.split('/')[-1])
@@ -15,7 +17,7 @@ def download_dataset(dir):
         return download_path
     r = requests.get(url, stream=True)
     total_size = int(r.headers.get('content-length', 0))
-    block_size = 1024
+    block_size = 1024 * 1024
 
     with open(download_path, 'wb') as f:
         for data in tqdm(r.iter_content(block_size),
@@ -51,10 +53,11 @@ def create_image_generator(dataroot, download=True, shuffle=True):
         raise RuntimeError('Empty dataset')
 
     if shuffle:
-        names = random.shuffle(names)
+        random.shuffle(names)
 
     def image_generator(ratio):
-        slice_at = len(names) * ratio
+        nonlocal names
+        slice_at = int(len(names) * ratio)
         ret = names[:slice_at]
         names = names[slice_at:]
         return ret
@@ -63,25 +66,26 @@ def create_image_generator(dataroot, download=True, shuffle=True):
 
 class Dataset(data.Dataset):
 
-    def __init__(self, dataroot, names, transform=None, target_transform=None,
-                 is_train=True, split=0.1, loader=None):
+    def __init__(self, dataroot, names, transform=None, target_transform=None):
         self.dataroot = dataroot
         self.names = names
+        self.num_classes = len(names)
         self.transform = transform
         self.target_transform = target_transform
-        self.is_train = is_train
-        self.split = split
-        self.loader = loader
-        self.image_names = []
-        self.labels = []
 
-        for name in self.names:
+        self.image_names = []
+        self.target_names = []
+        self.target_labels = []
+
+        for index, name in enumerate(self.names):
             for image_name in os.listdir(os.path.join(self.dataroot, name)):
                 self.image_names.append(image_name)
-                self.labels.append(name)
+                self.target_labels.append(index)
+                self.target_names.append(name)
 
     def __len__(self):
-        return len(self.labels)
+        return len(self.target_labels)
 
     def __getitem__(self, index):
-        return (self.image_names[index], self.labels[index])
+        image_path = os.path.join(self.dataroot, self.target_names[index], self.image_names[index])
+        return (image_loader(image_path), self.target_labels[index], self.target_names[index])
