@@ -1,5 +1,7 @@
 import torch
 
+from device import device
+
 def compute_center_loss(features, centers, targets, lamda):
     features = features.view(features.size(0), -1)
     target_centers = centers[targets]
@@ -14,8 +16,13 @@ def get_center_delta(features, centers, targets, alpha):
     features = features[indices]
 
     delta_centers = features - target_centers
-    uni_targets, indices = torch.unique( targets, sorted=True, return_inverse=True )
-    delta_centers = torch.zeros(uni_targets.size(0), delta_centers.size(1)).index_add_(0, indices, delta_centers)
+    uni_targets, indices = torch.unique( targets.cpu(), sorted=True, return_inverse=True )
+
+    uni_targets = uni_targets.to(device)
+    indices = indices.to(device)
+
+    delta_centers = torch.zeros(uni_targets.size(0), delta_centers.size(1))\
+            .to(device).index_add_(0, indices, delta_centers)
 
     targets_repeat_num = uni_targets.size()[0]
     uni_targets_repeat_num = targets.size()[0]

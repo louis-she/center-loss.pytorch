@@ -6,6 +6,7 @@ from torchvision import transforms
 from dataset import Dataset, create_image_generator
 from loss import compute_center_loss, get_center_delta
 from model import FaceModel
+from device import device
 
 if __name__ == '__main__':
     #TODO: add arg control
@@ -25,8 +26,7 @@ if __name__ == '__main__':
     training_dataloader = torch.utils.data.DataLoader(training_dataset, batch_size=16)
     validation_dataloader = torch.utils.data.DataLoader(validation_dataset, batch_size=16)
 
-    model = FaceModel(training_dataset.num_classes)
-
+    model = FaceModel(training_dataset.num_classes).to(device)
 
     trainables_wo_bn = [param for name, param in model.named_parameters() if param.requires_grad and not 'bn' in name]
     trainables_only_bn = [param for name, param in model.named_parameters() if param.requires_grad and 'bn' in name]
@@ -38,10 +38,11 @@ if __name__ == '__main__':
     lamda = 0.003
     alpha = 0.5
 
-    model._buffers['centers'] = (torch.rand(training_dataset.num_classes, 512))  - 0.5 * 2
+    model._buffers['centers'] = torch.rand(training_dataset.num_classes, 512).to(device)  - 0.5 * 2
 
     for images, targets, names in training_dataloader:
-        targets = torch.tensor(targets)
+        targets = torch.tensor(targets).to(device)
+        images = images.to(device)
 
         logits, features = model(images)
         cross_entropy_loss = torch.nn.functional.cross_entropy(logits, targets)
