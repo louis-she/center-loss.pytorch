@@ -1,4 +1,5 @@
 import os
+import argparse
 
 import torch
 from torchvision import transforms
@@ -9,8 +10,17 @@ from model import FaceModel
 from device import device
 from trainer import Trainer
 
+parser = argparse.ArgumentParser(description='center loss example')
+parser.add_argument('--batch_size', type=int, default=256, metavar='N',
+                    help='input batch size for training (default: 256)')
+parser.add_argument('--epochs', type=int, default=30, metavar='N',
+                    help='number of epochs to train (default: 30)')
+parser.add_argument('--lr', type=float, default=0.0001, help='learning rate, default=0.001')
+parser.add_argument('--resume', type=str, help='model path to the resume training', default=False)
+
 if __name__ == '__main__':
-    #TODO: add arg control
+    args = parser.parse_args()
+
     home = os.path.expanduser("~")
     dataset_root = os.path.join(home, 'datasets', 'flw')
     data_generator = create_image_generator(dataset_root)
@@ -24,8 +34,8 @@ if __name__ == '__main__':
     training_dataset = Dataset(dataset_root, data_generator(0.8), train_transforms)
     validation_dataset = Dataset(dataset_root, data_generator(1))
 
-    training_dataloader = torch.utils.data.DataLoader(training_dataset, batch_size=1024, num_workers=4)
-    validation_dataloader = torch.utils.data.DataLoader(validation_dataset, batch_size=1024, num_workers=4)
+    training_dataloader = torch.utils.data.DataLoader(training_dataset, batch_size=args.batch_size, num_workers=6, shuffle=True)
+    validation_dataloader = torch.utils.data.DataLoader(validation_dataset, batch_size=1024, num_workers=6, shuffle=True)
 
     model = FaceModel(training_dataset.num_classes).to(device)
     model.load_state_dict(torch.load( './resnet18.pth' ), strict=False)
@@ -35,12 +45,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD([
         {'params': trainables_wo_bn, 'weight_decay': 0.0001},
         {'params': trainables_only_bn}
-    ], lr=0.001, momentum=0.9)
+    ], lr=args.lr, momentum=0.9)
 
-    lamda = 0.003
-    alpha = 0.5
-
-    max_epoch = 30
-
-    trainer = Trainer(optimizer, model, training_dataloader, validation_dataloader)
+    trainer = Trainer(optimizer, model, training_dataloader, validation_dataloader, max_epoch=args.epochs, resume=args.resume)
     trainer.train()

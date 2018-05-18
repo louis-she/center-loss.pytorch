@@ -26,7 +26,7 @@ def download_dataset(dir):
             f.write(data)
     return download_path
 
-def create_image_generator(dataroot, download=True, shuffle=True):
+def create_image_generator(dataroot, download=True):
     if not os.path.isdir(dataroot):
         if download is False:
             raise RuntimeError('Dataroot {} is not a directory'
@@ -51,9 +51,6 @@ def create_image_generator(dataroot, download=True, shuffle=True):
     names = os.listdir(dataroot)
     if len(names) == 0:
         raise RuntimeError('Empty dataset')
-
-    if shuffle:
-        random.shuffle(names)
 
     def image_generator(ratio):
         nonlocal names

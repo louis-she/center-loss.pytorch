@@ -8,7 +8,7 @@ from loss import compute_center_loss, get_center_delta
 class Trainer(object):
 
     def __init__(self, optimizer, model, training_dataloader, validation_dataloader, log_dir=False,
-            max_epoch=100, resume=False, persist_stride=10, persist_best=True, lamda=0.0003, alpha=0.5):
+            max_epoch=100, resume=False, persist_stride=30, persist_best=True, lamda=0.0001, alpha=0.5):
         self.log_dir = log_dir
         self.optimizer = optimizer
         self.model = model
@@ -19,6 +19,7 @@ class Trainer(object):
         self.validation_dataloader = validation_dataloader
         self.training_losses = {'center': [], 'cross_entropy': [], 'total': []}
         self.validation_losses = {'center': [], 'cross_entropy': [], 'total': []}
+        self.start_epoch = 1
         self.current_epoch = 1
         self.lamda = lamda
         self.alpha = alpha
@@ -29,11 +30,20 @@ class Trainer(object):
             os.mkdir(self.log_dir)
 
         if resume:
-            #TODO: add resume functionality
-            pass
+            state_file = os.path.join(self.log_dir, 'models', resume)
+            if not os.path.isfile(state_file):
+                raise RuntimeError("resume file {} is not found".format(state_file))
+            print("loading checkpoint {}".format(state_file))
+            checkpoint = torch.load(state_file)
+            self.start_epoch = self.current_epoch = checkpoint['epoch']
+            self.model.load_state_dict(checkpoint['state_dict'], strict=True)
+            self.optimizer.load_state_dict(checkpoint['optimizer'])
+            self.training_losses = checkpoint['training_losses']
+            self.validation_losses = checkpoint['validation_losses']
+            print("loaded checkpoint {} (epoch {})".format(state_file, self.current_epoch))
 
     def train(self):
-        for self.current_epoch in range(1, self.max_epoch):
+        for self.current_epoch in range(self.start_epoch, self.max_epoch):
             self.train_epoch()
             self.validate_epoch()
             if not (self.current_epoch % self.persist_stride):
