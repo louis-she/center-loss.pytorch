@@ -11,9 +11,9 @@ Center loss implementation for face recognition in pytorch. Paper at: https://yd
 ### Requirements
 
 - [x] Dataset and loader for `LFW` dataset.
-- [ ] Feature networks.
-- [ ] Loss functions.
-- [ ] Training process.
+- [x] Feature networks.
+- [x] Loss functions.
+- [x] Training process.
 - [ ] Evaluation metrics.
 - [ ] Inference.
 

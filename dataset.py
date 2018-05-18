@@ -88,4 +88,7 @@ class Dataset(data.Dataset):
 
     def __getitem__(self, index):
         image_path = os.path.join(self.dataroot, self.target_names[index], self.image_names[index])
-        return (image_loader(image_path), self.target_labels[index], self.target_names[index])
+        image = image_loader(image_path)
+        if self.transform:
+            image = self.transform(image)
+        return (image, self.target_labels[index], self.target_names[index])
