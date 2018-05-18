@@ -1,5 +1,8 @@
+import torch
 from torch import nn
 from torchvision.models import resnet18
+
+from device import device
 
 class FaceModel(nn.Module):
 
@@ -8,6 +11,7 @@ class FaceModel(nn.Module):
         self.base = resnet18()
         self.extract_feature = nn.Linear(512*4*3, 512)
         self.classifier = nn.Linear(512, num_classes)
+        self.register_buffer('centers', torch.rand(num_classes, 512).to(device)  - 0.5 * 2)
 
     def forward(self, x):
         x = self.base.conv1(x)

@@ -24,8 +24,8 @@ if __name__ == '__main__':
     training_dataset = Dataset(dataset_root, data_generator(0.8), train_transforms)
     validation_dataset = Dataset(dataset_root, data_generator(1))
 
-    training_dataloader = torch.utils.data.DataLoader(training_dataset, batch_size=128)
-    validation_dataloader = torch.utils.data.DataLoader(validation_dataset, batch_size=128)
+    training_dataloader = torch.utils.data.DataLoader(training_dataset, batch_size=1024, num_workers=4)
+    validation_dataloader = torch.utils.data.DataLoader(validation_dataset, batch_size=1024, num_workers=4)
 
     model = FaceModel(training_dataset.num_classes).to(device)
     model.load_state_dict(torch.load( './resnet18.pth' ), strict=False)
@@ -40,7 +40,6 @@ if __name__ == '__main__':
     lamda = 0.003
     alpha = 0.5
 
-    model._buffers['centers'] = torch.rand(training_dataset.num_classes, 512).to(device)  - 0.5 * 2
     max_epoch = 30
 
     trainer = Trainer(optimizer, model, training_dataloader, validation_dataloader)

@@ -8,7 +8,7 @@ from loss import compute_center_loss, get_center_delta
 class Trainer(object):
 
     def __init__(self, optimizer, model, training_dataloader, validation_dataloader, log_dir=False,
-            max_epoch=100, resume=False, persist_stride=20, persist_best=True, lamda=0.003, alpha=0.5):
+            max_epoch=100, resume=False, persist_stride=10, persist_best=True, lamda=0.0003, alpha=0.5):
         self.log_dir = log_dir
         self.optimizer = optimizer
         self.model = model
@@ -47,11 +47,12 @@ class Trainer(object):
         for images, targets, names in self.training_dataloader:
             targets = torch.tensor(targets).to(device)
             images = images.to(device)
+            centers = self.model.centers
 
             logits, features = self.model(images)
 
             cross_entropy_loss = torch.nn.functional.cross_entropy(logits, targets)
-            center_loss = compute_center_loss(features, self.model._buffers['centers'], targets, self.lamda)
+            center_loss = compute_center_loss(features, centers, targets, self.lamda)
             loss = cross_entropy_loss + center_loss
             print("cross entropy loss: {} - center loss: {} - total loss: {}".format(cross_entropy_loss, center_loss, loss))
 
@@ -63,8 +64,10 @@ class Trainer(object):
             loss.backward()
             self.optimizer.step()
 
-            center_deltas = get_center_delta(features, self.model._buffers['centers'], targets, self.alpha)
-            self.model._buffers['centers'] = self.model._buffers['centers'] - center_deltas
+            # make features untrack by autograd, or there will be a memory
+            # leak when updating the centers
+            center_deltas = get_center_delta(features.data, centers, targets, self.alpha)
+            self.model.centers = centers - center_deltas
 
         self.training_losses['center'].append(total_center_loss)
         self.training_losses['cross_entropy'].append(total_cross_entropy_loss)
