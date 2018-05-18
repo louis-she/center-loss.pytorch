@@ -7,6 +7,7 @@ from dataset import Dataset, create_image_generator
 from loss import compute_center_loss, get_center_delta
 from model import FaceModel
 from device import device
+from trainer import Trainer
 
 if __name__ == '__main__':
     #TODO: add arg control
@@ -23,10 +24,11 @@ if __name__ == '__main__':
     training_dataset = Dataset(dataset_root, data_generator(0.8), train_transforms)
     validation_dataset = Dataset(dataset_root, data_generator(1))
 
-    training_dataloader = torch.utils.data.DataLoader(training_dataset, batch_size=16)
-    validation_dataloader = torch.utils.data.DataLoader(validation_dataset, batch_size=16)
+    training_dataloader = torch.utils.data.DataLoader(training_dataset, batch_size=128)
+    validation_dataloader = torch.utils.data.DataLoader(validation_dataset, batch_size=128)
 
     model = FaceModel(training_dataset.num_classes).to(device)
+    model.load_state_dict(torch.load( './resnet18.pth' ), strict=False)
 
     trainables_wo_bn = [param for name, param in model.named_parameters() if param.requires_grad and not 'bn' in name]
     trainables_only_bn = [param for name, param in model.named_parameters() if param.requires_grad and 'bn' in name]
@@ -39,21 +41,7 @@ if __name__ == '__main__':
     alpha = 0.5
 
     model._buffers['centers'] = torch.rand(training_dataset.num_classes, 512).to(device)  - 0.5 * 2
+    max_epoch = 30
 
-    for images, targets, names in training_dataloader:
-        targets = torch.tensor(targets).to(device)
-        images = images.to(device)
-
-        logits, features = model(images)
-        cross_entropy_loss = torch.nn.functional.cross_entropy(logits, targets)
-        center_loss = compute_center_loss(features, model._buffers['centers'], targets, lamda)
-        loss = cross_entropy_loss + center_loss
-        print("cross entropy loss: {} - center loss: {} - total loss: {}".format(cross_entropy_loss, center_loss, loss))
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # update center
-        center_deltas = get_center_delta(features, model._buffers['centers'], targets, alpha)
-        model._buffers['centers'] = model._buffers['centers'] - center_deltas
+    trainer = Trainer(optimizer, model, training_dataloader, validation_dataloader)
+    trainer.train()
