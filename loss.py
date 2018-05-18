@@ -6,7 +6,7 @@ def compute_center_loss(features, centers, targets, lamda):
     center_loss = lamda / 2 * torch.sum(torch.pow(features - target_centers, 2)).item()
     return center_loss
 
-def get_center_delta(features, centers, targets):
+def get_center_delta(features, centers, targets, alpha):
     # implementation equation (4) in the center-loss paper
     features = features.view(features.size(0), -1)
     targets, indices = torch.sort(targets)
@@ -23,7 +23,7 @@ def get_center_delta(features, centers, targets):
     uni_targets_repeat = uni_targets.unsqueeze(1).repeat(1, uni_targets_repeat_num)
     same_class_feature_count = torch.sum(targets_repeat == uni_targets_repeat, dim=1).float().unsqueeze(1)
 
-    delta_centers = delta_centers / (same_class_feature_count + 1.0)
+    delta_centers = delta_centers / (same_class_feature_count + 1.0) * alpha
     result = torch.zeros_like(centers)
     result[uni_targets, :] = delta_centers
     return result
