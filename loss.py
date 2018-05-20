@@ -2,10 +2,11 @@ import torch
 
 from device import device
 
-def compute_center_loss(features, centers, targets, lamda):
+def compute_center_loss(features, centers, targets):
     features = features.view(features.size(0), -1)
     target_centers = centers[targets]
-    center_loss = lamda / 2 * torch.sum(torch.pow(features - target_centers, 2))
+    criterion = torch.nn.MSELoss()
+    center_loss = criterion(features, target_centers)
     return center_loss
 
 def get_center_delta(features, centers, targets, alpha):

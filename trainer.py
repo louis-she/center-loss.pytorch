@@ -62,9 +62,9 @@ class Trainer(object):
             logits, features = self.model(images)
 
             cross_entropy_loss = torch.nn.functional.cross_entropy(logits, targets)
-            center_loss = compute_center_loss(features, centers, targets, self.lamda)
-            loss = cross_entropy_loss + center_loss
-            print("cross entropy loss: {} - center loss: {} - total loss: {}".format(cross_entropy_loss, center_loss, loss))
+            center_loss = compute_center_loss(features, centers, targets)
+            loss = self.lamda * center_loss + cross_entropy_loss
+            print("cross entropy loss: {} - center loss: {} - total weighted loss: {}".format(cross_entropy_loss, center_loss, loss))
 
             total_cross_entropy_loss += cross_entropy_loss
             total_center_loss += center_loss
