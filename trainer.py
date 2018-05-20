@@ -8,7 +8,7 @@ from loss import compute_center_loss, get_center_delta
 class Trainer(object):
 
     def __init__(self, optimizer, model, training_dataloader, validation_dataloader, log_dir=False,
-            max_epoch=100, resume=False, persist_stride=30, persist_best=True, lamda=0.0001, alpha=0.5):
+            max_epoch=100, resume=False, persist_stride=30, persist_best=True, lamda=0.03, alpha=0.5):
         self.log_dir = log_dir
         self.optimizer = optimizer
         self.model = model
