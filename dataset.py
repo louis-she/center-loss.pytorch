@@ -1,7 +1,7 @@
 import os
 import tarfile
 import random
-from math import ceil
+from math import ceil, floor
 from tqdm import tqdm
 
 import requests
@@ -26,7 +26,7 @@ def download_dataset(dir):
             f.write(data)
     return download_path
 
-def create_image_generator(dataroot, download=True):
+def create_datasets(dataroot, download=True, train_val_split=0.9):
     if not os.path.isdir(dataroot):
         if download is False:
             raise RuntimeError('Dataroot {} is not a directory'
@@ -52,40 +52,34 @@ def create_image_generator(dataroot, download=True):
     if len(names) == 0:
         raise RuntimeError('Empty dataset')
 
-    def image_generator(ratio):
-        nonlocal names
-        slice_at = int(len(names) * ratio)
-        ret = names[:slice_at]
-        names = names[slice_at:]
-        return ret
+    training_set = []
+    validation_set = []
+    for klass, name in enumerate(names):
+        def add_class(image):
+            image_path = os.path.join(dataroot, name, image)
+            return (image_path, klass, name)
 
-    return image_generator
+        images_of_person = os.listdir(os.path.join(dataroot, name))
+        total = len(images_of_person)
+
+        training_set += map(add_class, images_of_person[ :ceil(total * train_val_split) ])
+        validation_set += map(add_class, images_of_person[ floor(total * train_val_split): ])
+
+    return training_set, validation_set, len(names)
 
 class Dataset(data.Dataset):
 
-    def __init__(self, dataroot, names, transform=None, target_transform=None):
-        self.dataroot = dataroot
-        self.names = names
-        self.num_classes = len(names)
+    def __init__(self, datasets, transform=None, target_transform=None):
+        self.datasets = datasets
+        self.num_classes = len(datasets)
         self.transform = transform
         self.target_transform = target_transform
 
-        self.image_names = []
-        self.target_names = []
-        self.target_labels = []
-
-        for index, name in enumerate(self.names):
-            for image_name in os.listdir(os.path.join(self.dataroot, name)):
-                self.image_names.append(image_name)
-                self.target_labels.append(index)
-                self.target_names.append(name)
-
     def __len__(self):
-        return len(self.target_labels)
+        return len(self.datasets)
 
     def __getitem__(self, index):
-        image_path = os.path.join(self.dataroot, self.target_names[index], self.image_names[index])
-        image = image_loader(image_path)
+        image = image_loader(self.datasets[index][0])
         if self.transform:
             image = self.transform(image)
-        return (image, self.target_labels[index], self.target_names[index])
+        return (image, self.datasets[index][1], self.datasets[index][2])
