@@ -6,7 +6,6 @@ from device import device
 from loss import compute_center_loss, get_center_delta
 
 def get_matches(targets, logits, n=1):
-    # compute acc here
     _, preds = logits.topk(n, dim=1)
     targets_repeated = targets.view(-1, 1).repeat(1, n)
     matches = torch.sum(preds == targets_repeated, dim=1).nonzero().size()[0]
@@ -15,7 +14,7 @@ def get_matches(targets, logits, n=1):
 class Trainer(object):
 
     def __init__(self, optimizer, model, training_dataloader, validation_dataloader, log_dir=False,
-            max_epoch=100, resume=False, persist_stride=30, persist_best=True, lamda=0.03, alpha=0.5):
+            max_epoch=100, resume=False, persist_stride=10, persist_best=True, lamda=0.03, alpha=0.5):
         self.log_dir = log_dir
         self.optimizer = optimizer
         self.model = model
@@ -50,7 +49,7 @@ class Trainer(object):
             print("loaded checkpoint {} (epoch {})".format(state_file, self.current_epoch))
 
     def train(self):
-        for self.current_epoch in range(self.start_epoch, self.max_epoch):
+        for self.current_epoch in range(self.start_epoch, self.max_epoch+1):
             self.run_epoch(mode='train')
             self.run_epoch(mode='validate')
             if not (self.current_epoch % self.persist_stride):
