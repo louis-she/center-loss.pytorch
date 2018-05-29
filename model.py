@@ -6,12 +6,14 @@ from device import device
 
 class FaceModel(nn.Module):
 
-    def __init__(self, num_classes):
+    def __init__(self, num_classes=None):
         super().__init__()
         self.base = resnet18()
         self.extract_feature = nn.Linear(512*4*3, 512)
-        self.classifier = nn.Linear(512, num_classes)
-        self.register_buffer('centers', (torch.rand(num_classes, 512).to(device)  - 0.5) * 2)
+        self.num_classes = num_classes
+        if self.num_classes:
+            self.classifier = nn.Linear(512, num_classes)
+            self.register_buffer('centers', (torch.rand(num_classes, 512).to(device)  - 0.5) * 2)
 
     def forward(self, x):
         x = self.base.conv1(x)
@@ -25,6 +27,6 @@ class FaceModel(nn.Module):
 
         x = x.view(x.size(0), -1)
         feature = self.extract_feature(x)
-        logits = self.classifier(feature)
+        logits = self.classifier(feature) if self.num_classes else None
 
         return logits, feature

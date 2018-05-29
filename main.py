@@ -22,7 +22,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     home = os.path.expanduser("~")
-    dataset_root = os.path.join(home, 'datasets', 'flw')
+    dataset_root = os.path.join(home, 'datasets', 'lfw')
     training_set, validation_set, num_classes = create_datasets(dataset_root)
 
     train_transforms = transforms.Compose([transforms.ToPILImage(),

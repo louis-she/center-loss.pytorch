@@ -1,54 +1,39 @@
 import os
-import tarfile
 import random
+import tarfile
 from math import ceil, floor
-from tqdm import tqdm
 
-import requests
 from torch.utils import data
+import numpy as np
 
-from utils import image_loader
+from utils import image_loader, download
 
-def download_dataset(dir):
-    url = "http://vis-www.cs.umass.edu/lfw/lfw-deepfunneled.tgz"
-    download_path = os.path.join(dir, url.split('/')[-1])
-    if os.path.isfile(download_path):
-        print('File {} already downloaded'.format(download_path))
-        return download_path
-    r = requests.get(url, stream=True)
-    total_size = int(r.headers.get('content-length', 0))
-    block_size = 1024 * 1024
+DATASET_TARBALL = "http://vis-www.cs.umass.edu/lfw/lfw-deepfunneled.tgz"
+PAIRS_TRAIN = "http://vis-www.cs.umass.edu/lfw/pairsDevTrain.txt"
+PAIRS_VAL = "http://vis-www.cs.umass.edu/lfw/pairsDevTest.txt"
 
-    with open(download_path, 'wb') as f:
-        for data in tqdm(r.iter_content(block_size),
-                total=ceil(total_size//block_size),
-                unit='KB', unit_scale=True):
-            f.write(data)
-    return download_path
-
-def create_datasets(dataroot, download=True, train_val_split=0.9):
+def create_datasets(dataroot, train_val_split=0.9):
     if not os.path.isdir(dataroot):
-        if download is False:
-            raise RuntimeError('Dataroot {} is not a directory'
-                .format(dataroot))
-        else:
-            print('Download dataset to {}'.format(dataroot))
-            os.mkdir(dataroot)
-            tarball = download_dataset(os.path.dirname(dataroot))
+        os.mkdir(dataroot)
 
-            print('Dataset downloaded to {}'.format(dataroot))
-            print('Extract dataset to {}'.format(dataroot))
+    dataroot_files = os.listdir(dataroot)
+    data_tarball_file = DATASET_TARBALL.split('/')[-1]
+    data_dir_name = data_tarball_file.split('.')[0]
 
-            def members(t, skipped_lenth):
-                for member in t.getmembers():
-                    member.path = member.path[l:]
-                    yield member
+    if data_dir_name not in dataroot_files:
+        if data_tarball_file not in dataroot_files:
+            tarball = download(dataroot, DATASET_TARBALL)
+        with tarfile.open(tarball, 'r') as t:
+            t.extractall(dataroot)
 
-            with tarfile.open(tarball, 'r') as t:
-                l = len(tarball.split('/')[-1].split('.')[0]) + 1
-                t.extractall(dataroot, members=members(t, l))
+        # download(dataroot, PAIRS_TRAIN)
+        # download(dataroot, PAIRS_VAL)
 
-    names = os.listdir(dataroot)
+    pairs_train = os.path.join(dataroot, 'pairsDevTrain.txt')
+    pairs_val = os.path.join(dataroot, 'pairsDevTest.txt')
+
+    images_root = os.path.join(dataroot, 'lfw-deepfunneled')
+    names = os.listdir(images_root)
     if len(names) == 0:
         raise RuntimeError('Empty dataset')
 
@@ -56,10 +41,10 @@ def create_datasets(dataroot, download=True, train_val_split=0.9):
     validation_set = []
     for klass, name in enumerate(names):
         def add_class(image):
-            image_path = os.path.join(dataroot, name, image)
+            image_path = os.path.join(images_root, name, image)
             return (image_path, klass, name)
 
-        images_of_person = os.listdir(os.path.join(dataroot, name))
+        images_of_person = os.listdir(os.path.join(images_root, name))
         total = len(images_of_person)
 
         training_set += map(add_class, images_of_person[ :ceil(total * train_val_split) ])
@@ -83,3 +68,55 @@ class Dataset(data.Dataset):
         if self.transform:
             image = self.transform(image)
         return (image, self.datasets[index][1], self.datasets[index][2])
+
+class PairedDataset(data.Dataset):
+
+    def __init__(self, dataroot, pairs_cfg, transform=None, loader=None):
+        self.dataroot = dataroot
+        self.pairs_cfg = pairs_cfg
+        self.transform = transform
+        self.loader = loader if loader else image_loader
+
+        self.image_names_a = []
+        self.image_names_b = []
+        self.matches = []
+
+        self._prepare_dataset()
+
+    def __len__(self):
+        return len(self.matches)
+
+    def __getitem__(self, index):
+        return (self.transform(self.loader(self.image_names_a[index])),
+                self.transform(self.loader(self.image_names_b[index])),
+                self.matches[index])
+
+class LFWPairedDataset(PairedDataset):
+
+    def _prepare_dataset(self):
+        pairs = self._read_pairs(self.pairs_cfg)
+
+        for pair in pairs:
+            if len(pair) == 3:
+                match = True
+                name1, name2, index1, index2 = pair[0], pair[0], int(pair[1]), int(pair[2])
+
+            else:
+                match = False
+                name1, name2, index1, index2 = pair[0], pair[2], int(pair[1]), int(pair[3])
+
+            self.image_names_a.append(os.path.join(self.dataroot, 'lfw-deepfunneled',\
+                    name1, "{}_{:04d}.jpg".format(name1, index1)))
+
+            self.image_names_b.append( os.path.join(self.dataroot, 'lfw-deepfunneled',\
+                    name2, "{}_{:04d}.jpg".format(name2, index2)))
+            self.matches.append(match)
+
+    def _read_pairs(self, pairs_filename):
+        pairs = []
+        with open(pairs_filename, 'r') as f:
+            for line in f.readlines()[1:]:
+                pair = line.strip().split()
+                pairs.append(pair)
+        return pairs
+
