@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import cv2
 import requests
+import matplotlib.pyplot as plt
 
 
 def download(dir, url, dist=None):
@@ -19,7 +20,8 @@ def download(dir, url, dist=None):
     block_size = 1024 * 1024
 
     with open(download_path, 'wb') as f:
-        for data in tqdm(r.iter_content(block_size),
+        for data in tqdm(
+                r.iter_content(block_size),
                 total=ceil(total_size//block_size),
                 unit='MB', unit_scale=True):
             f.write(data)
@@ -29,3 +31,13 @@ def download(dir, url, dist=None):
 
 def image_loader(image_path):
     return cv2.imread(image_path)
+
+
+def generate_roc_curve(fpr, tpr, path):
+    assert len(fpr) == len(tpr)
+
+    fig = plt.figure()
+    plt.xlabel('FPR')
+    plt.ylabel('TPR')
+    plt.plot(fpr, tpr)
+    fig.savefig(path, dpi=fig.dpi)

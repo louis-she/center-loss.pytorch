@@ -12,6 +12,7 @@ DATASET_TARBALL = "http://vis-www.cs.umass.edu/lfw/lfw-deepfunneled.tgz"
 PAIRS_TRAIN = "http://vis-www.cs.umass.edu/lfw/pairsDevTrain.txt"
 PAIRS_VAL = "http://vis-www.cs.umass.edu/lfw/pairsDevTest.txt"
 
+
 def create_datasets(dataroot, train_val_split=0.9):
     if not os.path.isdir(dataroot):
         os.mkdir(dataroot)
@@ -25,12 +26,6 @@ def create_datasets(dataroot, train_val_split=0.9):
             tarball = download(dataroot, DATASET_TARBALL)
         with tarfile.open(tarball, 'r') as t:
             t.extractall(dataroot)
-
-        # download(dataroot, PAIRS_TRAIN)
-        # download(dataroot, PAIRS_VAL)
-
-    pairs_train = os.path.join(dataroot, 'pairsDevTrain.txt')
-    pairs_val = os.path.join(dataroot, 'pairsDevTest.txt')
 
     images_root = os.path.join(dataroot, 'lfw-deepfunneled')
     names = os.listdir(images_root)
@@ -47,10 +42,15 @@ def create_datasets(dataroot, train_val_split=0.9):
         images_of_person = os.listdir(os.path.join(images_root, name))
         total = len(images_of_person)
 
-        training_set += map(add_class, images_of_person[ :ceil(total * train_val_split) ])
-        validation_set += map(add_class, images_of_person[ floor(total * train_val_split): ])
+        training_set += map(
+                add_class,
+                images_of_person[:ceil(total * train_val_split)])
+        validation_set += map(
+                add_class,
+                images_of_person[floor(total * train_val_split):])
 
     return training_set, validation_set, len(names)
+
 
 class Dataset(data.Dataset):
 
@@ -68,6 +68,7 @@ class Dataset(data.Dataset):
         if self.transform:
             image = self.transform(image)
         return (image, self.datasets[index][1], self.datasets[index][2])
+
 
 class PairedDataset(data.Dataset):
 
@@ -91,6 +92,10 @@ class PairedDataset(data.Dataset):
                 self.transform(self.loader(self.image_names_b[index])),
                 self.matches[index])
 
+    def _prepare_dataset(self):
+        raise NotImplementedError
+
+
 class LFWPairedDataset(PairedDataset):
 
     def _prepare_dataset(self):
@@ -99,16 +104,20 @@ class LFWPairedDataset(PairedDataset):
         for pair in pairs:
             if len(pair) == 3:
                 match = True
-                name1, name2, index1, index2 = pair[0], pair[0], int(pair[1]), int(pair[2])
+                name1, name2, index1, index2 = \
+                    pair[0], pair[0], int(pair[1]), int(pair[2])
 
             else:
                 match = False
-                name1, name2, index1, index2 = pair[0], pair[2], int(pair[1]), int(pair[3])
+                name1, name2, index1, index2 = \
+                    pair[0], pair[2], int(pair[1]), int(pair[3])
 
-            self.image_names_a.append(os.path.join(self.dataroot, 'lfw-deepfunneled',\
+            self.image_names_a.append(os.path.join(
+                    self.dataroot, 'lfw-deepfunneled',
                     name1, "{}_{:04d}.jpg".format(name1, index1)))
 
-            self.image_names_b.append( os.path.join(self.dataroot, 'lfw-deepfunneled',\
+            self.image_names_b.append(os.path.join(
+                    self.dataroot, 'lfw-deepfunneled',
                     name2, "{}_{:04d}.jpg".format(name2, index2)))
             self.matches.append(match)
 
@@ -119,4 +128,3 @@ class LFWPairedDataset(PairedDataset):
                 pair = line.strip().split()
                 pairs.append(pair)
         return pairs
-

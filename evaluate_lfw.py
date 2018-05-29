@@ -2,7 +2,10 @@ import os
 
 import torch
 from torch.utils.data import DataLoader
+from torch.nn import CosineSimilarity
 from torchvision import transforms
+import numpy as np
+import matplotlib.pyplot as plt
 
 from utils import download
 from metrics import compute_roc
@@ -19,7 +22,7 @@ def read_pairs(pairs_filename):
             pairs.append(pair)
     return pairs
 
-def evaluate(embedings1, embedings2, matches, thresholds, dis_metric='euclid'):
+def evaluate(embedings_a, embedings_b, matches, thresholds, dis_metric='euclid'):
     """
     Args:
         features: array of pair features, [ ([feature_1], [feature_2], is_matched), ... ]
@@ -29,16 +32,16 @@ def evaluate(embedings1, embedings2, matches, thresholds, dis_metric='euclid'):
     """
     # 1. compute distance
     if dis_metric == 'euclid':
-        diff = np.subtract(embeddings1, embeddings2)
-        distances = np.sum(np.square(diff), 1)
+        distances = torch.sum(torch.pow(embedings_a - embedings_b, 2), dim=1)
 
     # 2. calculate roc
     return compute_roc(distances, matches, thresholds)
 
 if __name__ == '__main__':
     home = os.path.expanduser("~")
-    dataset_root = os.path.join(home, 'datasets', 'lfw')
+    dataset_dir = os.path.join(home, 'datasets', 'lfw')
 
+    batch_size = 128
     dataroot = '/home/louis/datasets/lfw'
 
     pairs_path = os.path.join(dataroot, 'pairs.txt')
@@ -51,7 +54,7 @@ if __name__ == '__main__':
                                                 transforms.Normalize([0.5,0.5,0.5], [0.5,0.5,0.5])])
 
     dataset = LFWPairedDataset(dataroot, pairs_path, transforms)
-    dataloader = DataLoader(dataset, batch_size=128, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=4)
 
     model = FaceModel().to(device)
     checkpoint = torch.load('./logs/models/epoch_50.pth.tar')
@@ -59,17 +62,30 @@ if __name__ == '__main__':
 
     embedings_a = torch.zeros(len(dataset), 512)
     embedings_b = torch.zeros(len(dataset), 512)
-    matches = torch.zeros(len(dataset))
+    matches = torch.zeros(len(dataset), dtype=torch.uint8)
 
-    iteration = 0
     for iteration, (images_a, images_b, batched_matches) in enumerate(dataloader):
-        batch_size = len(batched_matches)
+        current_batch_size = len(batched_matches)
         images_a = images_a.to(device)
         images_b = images_b.to(device)
 
         _, batched_embedings_a = model(images_a)
         _, batched_embedings_b = model(images_b)
 
-        embedings_a[iteration:iteration+batch_size, :] = batched_embedings_a.data
-        embedings_b[iteration:iteration+batch_size, :] = batched_embedings_b.data
-        matches[iteration:iteration+batch_size] = batched_matches.data
+        start = batch_size * iteration
+        end = start + current_batch_size
+
+        embedings_a[start:end, :] = batched_embedings_a.data
+        embedings_b[start:end, :] = batched_embedings_b.data
+        matches[start:end] = batched_matches.data
+
+    thresholds = np.arange(0, 4, 0.1)
+    tpr, fpr, accuracy = evaluate(embedings_a, embedings_b, matches, thresholds, 'cosine')
+    print(accuracy)
+
+    fig = plt.figure()
+    plt.xlabel('FPR')
+    plt.ylabel('TPR')
+    plt.plot(fpr, tpr)
+    fig.savefig('/tmp/temp.png', dpi=fig.dpi)
+
