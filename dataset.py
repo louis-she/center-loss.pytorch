@@ -12,13 +12,14 @@ DATASET_TARBALL = "http://vis-www.cs.umass.edu/lfw/lfw-deepfunneled.tgz"
 PAIRS_TRAIN = "http://vis-www.cs.umass.edu/lfw/pairsDevTrain.txt"
 PAIRS_VAL = "http://vis-www.cs.umass.edu/lfw/pairsDevTest.txt"
 
-def create_datasets(dataroot, train_val_split=0.9):
+
+def create_datasets(dataroot, train_val_split=0.95,
+                    data_dir_name='lfw-deepfunneled'):
     if not os.path.isdir(dataroot):
         os.mkdir(dataroot)
 
     dataroot_files = os.listdir(dataroot)
     data_tarball_file = DATASET_TARBALL.split('/')[-1]
-    data_dir_name = data_tarball_file.split('.')[0]
 
     if data_dir_name not in dataroot_files:
         if data_tarball_file not in dataroot_files:
@@ -26,7 +27,7 @@ def create_datasets(dataroot, train_val_split=0.9):
         with tarfile.open(tarball, 'r') as t:
             t.extractall(dataroot)
 
-    images_root = os.path.join(dataroot, 'lfw-deepfunneled')
+    images_root = os.path.join(dataroot, data_dir_name)
     names = os.listdir(images_root)
     if len(names) == 0:
         raise RuntimeError('Empty dataset')

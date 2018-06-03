@@ -51,8 +51,6 @@ def get_model_class(args):
         model_class = Resnet18FaceModel
     if args.arch == 'resnet50':
         model_class = Resnet50FaceModel
-    elif args.arch == 'inceptionv3':
-        model_class = InceptionFaceModel
 
     return model_class
 
@@ -62,7 +60,8 @@ def train(args):
     log_dir = get_log_dir(args)
     model_class = get_model_class(args)
 
-    training_set, validation_set, num_classes = create_datasets(dataset_dir)
+    training_set, validation_set, num_classes = create_datasets(
+        dataset_dir, data_dir_name='CASIA-maxpy-clean')
 
     training_dataset = Dataset(
             training_set, transform_for_training(model_class.IMAGE_SHAPE))
@@ -72,14 +71,14 @@ def train(args):
     training_dataloader = torch.utils.data.DataLoader(
         training_dataset,
         batch_size=args.batch_size,
-        num_workers=6,
+        num_workers=4,
         shuffle=True
     )
 
     validation_dataloader = torch.utils.data.DataLoader(
         validation_dataset,
         batch_size=args.batch_size,
-        num_workers=6,
+        num_workers=4,
         shuffle=False
     )
 

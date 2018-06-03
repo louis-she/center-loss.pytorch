@@ -11,7 +11,7 @@ class Trainer(object):
     def __init__(
             self, optimizer, model, training_dataloader,
             validation_dataloader, log_dir=False, max_epoch=100, resume=False,
-            persist_stride=5, lamda=0.03, alpha=0.5):
+            persist_stride=3, lamda=0.03, alpha=0.5):
 
         self.log_dir = log_dir
         self.optimizer = optimizer
@@ -45,7 +45,7 @@ class Trainer(object):
                     "resume file {} is not found".format(state_file))
             print("loading checkpoint {}".format(state_file))
             checkpoint = torch.load(state_file)
-            self.start_epoch = self.current_epoch = checkpoint['epoch']
+            self.start_epoch = self.current_epoch = checkpoint['epoch'] + 1
             self.model.load_state_dict(checkpoint['state_dict'], strict=True)
             self.optimizer.load_state_dict(checkpoint['optimizer'])
             self.training_losses = checkpoint['training_losses']
@@ -78,7 +78,7 @@ class Trainer(object):
         batch = 0
 
         with torch.set_grad_enabled(mode == 'train'):
-            for images, targets, names in dataloader:
+            for iter_num, (images, targets, names) in enumerate(dataloader):
                 batch += 1
                 targets = torch.tensor(targets).to(device)
                 images = images.to(device)
@@ -92,10 +92,11 @@ class Trainer(object):
                 loss = self.lamda * center_loss + cross_entropy_loss
 
                 print("[{}:{}] cross entropy loss: {:.8f} - center loss: "
-                      "{:.8f} - total weighted loss: {:.8f}".format(
-                          mode, self.current_epoch,
-                          cross_entropy_loss.item(),
-                          center_loss.item(), loss.item()))
+                      "{:.8f} - total loss: {:.8f} - iter {}/{}"
+                      .format(mode, self.current_epoch,
+                              cross_entropy_loss.item(),
+                              center_loss.item(), loss.item(),
+                              iter_num, len(dataloader)))
 
                 total_cross_entropy_loss += cross_entropy_loss
                 total_center_loss += center_loss
