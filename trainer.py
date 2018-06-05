@@ -11,7 +11,7 @@ class Trainer(object):
     def __init__(
             self, optimizer, model, training_dataloader,
             validation_dataloader, log_dir=False, max_epoch=100, resume=False,
-            persist_stride=3, lamda=0.03, alpha=0.5):
+            persist_stride=20, lamda=0.08, alpha=0.1):
 
         self.log_dir = log_dir
         self.optimizer = optimizer
@@ -56,7 +56,8 @@ class Trainer(object):
     def train(self):
         for self.current_epoch in range(self.start_epoch, self.max_epoch+1):
             self.run_epoch(mode='train')
-            self.run_epoch(mode='validate')
+            if self.validation_dataloader:
+                self.run_epoch(mode='validate')
             if not (self.current_epoch % self.persist_stride):
                 self.persist()
 
@@ -78,7 +79,7 @@ class Trainer(object):
         batch = 0
 
         with torch.set_grad_enabled(mode == 'train'):
-            for iter_num, (images, targets, names) in enumerate(dataloader):
+            for iter_num, (images, targets) in enumerate(dataloader):
                 batch += 1
                 targets = torch.tensor(targets).to(device)
                 images = images.to(device)
@@ -86,16 +87,20 @@ class Trainer(object):
 
                 logits, features = self.model(images)
 
-                cross_entropy_loss = torch.nn.functional.cross_entropy(
+                cross_entropy_loss = torch.nn.functional.nll_loss(
                     logits, targets)
+                # cross_entropy_loss = torch.tensor(0).float().to(device)
+                # cross_entropy_loss = torch.nn.functional.cross_entropy(
+                #     logits, targets)
                 center_loss = compute_center_loss(features, centers, targets)
-                loss = self.lamda * center_loss + cross_entropy_loss
+                # center_loss = 0
+                loss = self.lamda * 0.5 * center_loss + cross_entropy_loss
 
                 print("[{}:{}] cross entropy loss: {:.8f} - center loss: "
                       "{:.8f} - total loss: {:.8f} - iter {}/{}"
                       .format(mode, self.current_epoch,
                               cross_entropy_loss.item(),
-                              center_loss.item(), loss.item(),
+                              center_loss, loss.item(),
                               iter_num, len(dataloader)))
 
                 total_cross_entropy_loss += cross_entropy_loss
@@ -111,7 +116,7 @@ class Trainer(object):
                     # a memory leak when updating the centers
                     center_deltas = get_center_delta(
                         features.data, centers, targets, self.alpha)
-                    self.model.centers = centers - center_deltas
+                    self.model.centers = centers + center_deltas
 
                 # compute acc here
                 total_top1_matches += self._get_matches(targets, logits, 1)
@@ -129,12 +134,13 @@ class Trainer(object):
             loss_recorder['top1acc'].append(top1_acc)
             loss_recorder['top3acc'].append(top3_acc)
 
+            print(self.model.centers)
             print(
                 "[{}:{}] finished. cross entropy loss: {:.8f} - "
                 "center loss: {:.8f} - together: {:.8f} - "
                 "top1 acc: {:.4f} % - top3 acc: {:.4f} %".format(
                     mode, self.current_epoch, cross_entropy_loss.item(),
-                    center_loss.item(), loss.item(),
+                    center_loss, loss.item(),
                     top1_acc*100, top3_acc*100))
 
     def _get_matches(self, targets, logits, n=1):

@@ -28,9 +28,8 @@ class CenterLossTest(unittest.TestCase):
         # size should match
         self.assertTrue(result.size() == self.centers.size())
         # for class 1
-        class1_result = -(
-            (self.features[0] + self.features[2]) -
-            2 * self.centers[1]) / 3 * self.alpha
+
+        class1_result = (self.centers * 2 - self.features[0] - self.features[2]) / (1 + 2) * self.alpha
 
         self.assertEqual(3, torch.sum(result[1] == class1_result).item())
         # for class 3
