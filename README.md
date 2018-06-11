@@ -83,6 +83,16 @@ ROC curve generated at /home/louis/center-loss.pytorch/logs/roc.png
 
 ![](images/roc.png)
 
+### Experiments with MNIST dataset
+
+**softmax only**
+
+![](images/softmax.png)
+
+**softmax + center loss**
+
+![](images/center-loss.png)
+
 
 ## Random People Verification
 
