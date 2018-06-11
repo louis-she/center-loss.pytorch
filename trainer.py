@@ -11,7 +11,7 @@ class Trainer(object):
     def __init__(
             self, optimizer, model, training_dataloader,
             validation_dataloader, log_dir=False, max_epoch=100, resume=False,
-            persist_stride=20, lamda=0.08, alpha=0.1):
+            persist_stride=2, lamda=0.08, alpha=0.5):
 
         self.log_dir = log_dir
         self.optimizer = optimizer
@@ -79,21 +79,17 @@ class Trainer(object):
         batch = 0
 
         with torch.set_grad_enabled(mode == 'train'):
-            for iter_num, (images, targets) in enumerate(dataloader):
+            for iter_num, (images, targets, _) in enumerate(dataloader):
                 batch += 1
                 targets = torch.tensor(targets).to(device)
                 images = images.to(device)
                 centers = self.model.centers
 
-                logits, features = self.model(images)
+                logits, features, feature_normed = self.model(images)
 
-                cross_entropy_loss = torch.nn.functional.nll_loss(
+                cross_entropy_loss = torch.nn.functional.cross_entropy(
                     logits, targets)
-                # cross_entropy_loss = torch.tensor(0).float().to(device)
-                # cross_entropy_loss = torch.nn.functional.cross_entropy(
-                #     logits, targets)
                 center_loss = compute_center_loss(features, centers, targets)
-                # center_loss = 0
                 loss = self.lamda * 0.5 * center_loss + cross_entropy_loss
 
                 print("[{}:{}] cross entropy loss: {:.8f} - center loss: "
@@ -134,7 +130,6 @@ class Trainer(object):
             loss_recorder['top1acc'].append(top1_acc)
             loss_recorder['top3acc'].append(top3_acc)
 
-            print(self.model.centers)
             print(
                 "[{}:{}] finished. cross entropy loss: {:.8f} - "
                 "center loss: {:.8f} - together: {:.8f} - "

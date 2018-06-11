@@ -64,19 +64,19 @@ def train(args):
     log_dir = get_log_dir(args)
     model_class = get_model_class(args)
 
-    # training_set, validation_set, num_classes = create_datasets(
-    #     dataset_dir, data_dir_name='CASIA-maxpy-clean')
+    training_set, validation_set, num_classes = create_datasets(
+        dataset_dir, data_dir_name='CASIA-maxpy-clean')
 
-    # training_dataset = Dataset(
-    #         training_set, transform_for_training(model_class.IMAGE_SHAPE))
-    # validation_dataset = Dataset(
-    #     validation_set, transform_for_infer(model_class.IMAGE_SHAPE))
+    training_dataset = Dataset(
+            training_set, transform_for_training(model_class.IMAGE_SHAPE))
+    validation_dataset = Dataset(
+        validation_set, transform_for_infer(model_class.IMAGE_SHAPE))
 
-    training_dataset = MNIST(
-            '/home/louis/lacie/linux/datasets/mnist', download=True,
-            transform=transform_for_training((28, 28)))
-    validation_dataset = training_dataset
-    num_classes = 10
+    # training_dataset = MNIST(
+    #         '/home/louis/lacie/linux/datasets/mnist', download=True,
+    #         transform=transform_for_training((28, 28)))
+    # validation_dataset = training_dataset
+    # num_classes = 10
 
     training_dataloader = torch.utils.data.DataLoader(
         training_dataset,
@@ -129,12 +129,8 @@ def evaluate(args):
     if not os.path.isfile(pairs_path):
         download(dataset_dir, 'http://vis-www.cs.umass.edu/lfw/pairs.txt')
 
-    # dataset = LFWPairedDataset(
-    #     dataset_dir, pairs_path, transform_for_infer(model_class.IMAGE_SHAPE))
-
-    dataset = MNIST(
-        '/home/louis/lacie/linux/datasets/mnist',
-        transform=transform_for_infer((28, 28)))
+    dataset = LFWPairedDataset(
+        dataset_dir, pairs_path, transform_for_infer(model_class.IMAGE_SHAPE))
 
     dataloader = DataLoader(dataset, batch_size=args.batch_size, num_workers=4)
     model = model_class(False).to(device)
@@ -143,40 +139,40 @@ def evaluate(args):
     model.load_state_dict(checkpoint['state_dict'], strict=False)
     model.eval()
 
-    embedings = torch.zeros(len(dataset), model.FEATURE_DIM)
-    colors = []
-    color_map = np.array(['red', 'yellow', 'blue', 'grey', 'silver',
-                 'tomato', 'khaki', 'pink', 'lime', 'gold'])
 
-    for iteration, (images, targets) in enumerate(dataloader):
-        images = images.to(device)
-        current_batch_size = images.size()[0]
+    embedings_a = torch.zeros(len(dataset), model.FEATURE_DIM)
+    embedings_b = torch.zeros(len(dataset), model.FEATURE_DIM)
+    matches = torch.zeros(len(dataset), dtype=torch.uint8)
 
-        _, batched_embedings = model(images)
+    for iteration, (images_a, images_b, batched_matches) \
+            in enumerate(dataloader):
+        current_batch_size = len(batched_matches)
+        images_a = images_a.to(device)
+        images_b = images_b.to(device)
+
+        _, _, batched_embedings_a = model(images_a)
+        _, _, batched_embedings_b = model(images_b)
 
         start = args.batch_size * iteration
         end = start + current_batch_size
 
-        embedings[start:end, :] = batched_embedings.data
-        colors += list(color_map[targets.numpy()])
+        embedings_a[start:end, :] = batched_embedings_a.data
+        embedings_b[start:end, :] = batched_embedings_b.data
+        matches[start:end] = batched_matches.data
 
-    plt.scatter(embedings[:, 0], embedings[:, 1], color=colors, s=1)
-    plt.scatter(model.centers[:, 0], model.centers[:, 1])
-    plt.savefig('./test.png')
+    thresholds = np.arange(0, 4, 0.1)
+    distances = torch.sum(torch.pow(embedings_a - embedings_b, 2), dim=1)
 
-    # thresholds = np.arange(0, 4, 0.1)
-    # distances = torch.sum(torch.pow(embedings_a - embedings_b, 2), dim=1)
+    tpr, fpr, accuracy, best_thresholds = compute_roc(
+        distances,
+        matches,
+        thresholds
+    )
 
-    # tpr, fpr, accuracy, best_thresholds = compute_roc(
-    #     distances,
-    #     matches,
-    #     thresholds
-    # )
-
-    # roc_file = args.roc if args.roc else os.path.join(log_dir, 'roc.png')
-    # generate_roc_curve(fpr, tpr, roc_file)
-    # print('Model accuracy is {}'.format(accuracy))
-    # print('ROC curve generated at {}'.format(roc_file))
+    roc_file = args.roc if args.roc else os.path.join(log_dir, 'roc.png')
+    generate_roc_curve(fpr, tpr, roc_file)
+    print('Model accuracy is {}'.format(accuracy))
+    print('ROC curve generated at {}'.format(roc_file))
 
 
 def verify(args):
@@ -196,7 +192,7 @@ def verify(args):
         model_class.IMAGE_SHAPE)(image_loader(image_b))
     images = torch.stack([image_a, image_b]).to(device)
 
-    _, (embedings_a, embedings_b) = model(images)
+    _, _, (embedings_a, embedings_b) = model(images)
 
     distance = torch.sum(torch.pow(embedings_a - embedings_b, 2)).item()
     print("distance: {}".format(distance))

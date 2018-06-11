@@ -11,7 +11,7 @@ def compute_center_loss(features, centers, targets):
     return center_loss
 
 
-def get_center_delta(features, centers, targets, alpha, beta=0.1, boundary=4):
+def get_center_delta(features, centers, targets, alpha):
     # implementation equation (4) in the center-loss paper
     features = features.view(features.size(0), -1)
     targets, indices = torch.sort(targets)
@@ -39,11 +39,6 @@ def get_center_delta(features, centers, targets, alpha, beta=0.1, boundary=4):
             targets_repeat == uni_targets_repeat, dim=1).float().unsqueeze(1)
 
     delta_centers = delta_centers / (same_class_feature_count + 1.0) * alpha
-
-    uni_centers = centers[uni_targets]
-    in_boundary = torch.sqrt(torch.sum(uni_centers**2, dim=1)) < boundary
-    delta_centers[in_boundary, :] += beta * uni_centers[in_boundary]
-
     result = torch.zeros_like(centers)
     result[uni_targets, :] = delta_centers
 

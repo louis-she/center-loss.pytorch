@@ -36,7 +36,7 @@ class ResnetFaceModel(FaceModel):
         feature_normed = feature.div(
             torch.norm(feature, p=2, dim=1, keepdim=True).expand_as(feature))
 
-        return logits, feature_normed
+        return logits, feature, feature_normed
 
 
 class Resnet18FaceModel(ResnetFaceModel):
