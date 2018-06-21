@@ -36,6 +36,7 @@ def compute_roc(distances, matches, thresholds, fold_size=10):
 
         # 1. find the best threshold for this fold using training set
         best_threshold_true_predicts = 0
+        best_threshold = 0
         for threshold_index, threshold in enumerate(thresholds):
             true_predicts = torch.sum((
                 training_distances < threshold

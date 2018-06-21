@@ -11,7 +11,7 @@ class Trainer(object):
     def __init__(
             self, optimizer, model, training_dataloader,
             validation_dataloader, log_dir=False, max_epoch=100, resume=False,
-            persist_stride=2, lamda=0.08, alpha=0.5):
+            persist_stride=1, lamda=0.08, alpha=0.5):
 
         self.log_dir = log_dir
         self.optimizer = optimizer
@@ -161,4 +161,6 @@ class Trainer(object):
             'validation_losses': self.validation_losses
         }
         state_path = os.path.join(model_dir, file_name)
+        newest_state_path = os.path.join(model_dir, 'latest.pth.tar')
         torch.save(state, state_path)
+        torch.save(state, newest_state_path)

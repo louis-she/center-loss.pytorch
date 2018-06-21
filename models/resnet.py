@@ -8,16 +8,17 @@ from device import device
 
 class ResnetFaceModel(FaceModel):
 
-    IMAGE_SHAPE = (96, 128)
+    IMAGE_SHAPE = (160, 160)
 
     def __init__(self, num_classes, feature_dim):
         super().__init__(num_classes, feature_dim)
 
         self.extract_feature = nn.Linear(
-            self.feature_dim*4*3, self.feature_dim)
+            2048*5*5, self.feature_dim)
         self.num_classes = num_classes
         if self.num_classes:
             self.classifier = nn.Linear(self.feature_dim, num_classes)
+        self.relu = nn.PReLU()
 
     def forward(self, x):
         x = self.base.conv1(x)
@@ -31,7 +32,7 @@ class ResnetFaceModel(FaceModel):
 
         x = x.view(x.size(0), -1)
         feature = self.extract_feature(x)
-        logits = self.classifier(feature) if self.num_classes else None
+        logits = self.classifier(self.relu(feature)) if self.num_classes else None
 
         feature_normed = feature.div(
             torch.norm(feature, p=2, dim=1, keepdim=True).expand_as(feature))
@@ -50,7 +51,7 @@ class Resnet18FaceModel(ResnetFaceModel):
 
 class Resnet50FaceModel(ResnetFaceModel):
 
-    FEATURE_DIM = 2048
+    FEATURE_DIM = 512
 
     def __init__(self, num_classes):
         super().__init__(num_classes, self.FEATURE_DIM)

@@ -28,10 +28,8 @@ def download(dir, url, dist=None):
     print('Downloaded {}'.format(dist))
     return download_path
 
-
 def image_loader(image_path):
     return cv2.imread(image_path)
-
 
 def generate_roc_curve(fpr, tpr, path):
     assert len(fpr) == len(tpr)

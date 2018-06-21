@@ -2,15 +2,18 @@ import os
 import argparse
 
 import torch
+import numpy as np
+import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.datasets import MNIST
-import numpy as np
-import matplotlib.pyplot as plt
+import torch.backends.cudnn as cudnn
+from torch.optim.lr_scheduler import MultiStepLR
+import torch.nn.functional as F
 
 from dataset import Dataset, create_datasets, LFWPairedDataset
 from loss import compute_center_loss, get_center_delta
-from models import Resnet50FaceModel, Resnet18FaceModel, MNISTModel, MNISTExample
+from models import Resnet50FaceModel, Resnet18FaceModel, MNISTModel, MNISTExample, InceptionResnetV2
 from device import device
 from trainer import Trainer
 from utils import download, generate_roc_curve, image_loader
@@ -19,6 +22,7 @@ from imageaug import transform_for_infer, transform_for_training
 
 
 def main(args):
+    cudnn.benchmark = True
     if args.evaluate:
         evaluate(args)
     elif args.verify_model:
@@ -55,6 +59,8 @@ def get_model_class(args):
         model_class = Resnet50FaceModel
     if args.arch == 'mnist':
         model_class = MNISTExample
+    if args.arch == 'inception_resnet_v2':
+        model_class = InceptionResnetV2
 
     return model_class
 
@@ -65,30 +71,25 @@ def train(args):
     model_class = get_model_class(args)
 
     training_set, validation_set, num_classes = create_datasets(
-        dataset_dir, data_dir_name='CASIA-maxpy-clean')
+        dataset_dir, data_dir_name='casia_maxpy_mtcnnpy_182')
 
     training_dataset = Dataset(
             training_set, transform_for_training(model_class.IMAGE_SHAPE))
+
     validation_dataset = Dataset(
         validation_set, transform_for_infer(model_class.IMAGE_SHAPE))
-
-    # training_dataset = MNIST(
-    #         '/home/louis/lacie/linux/datasets/mnist', download=True,
-    #         transform=transform_for_training((28, 28)))
-    # validation_dataset = training_dataset
-    # num_classes = 10
 
     training_dataloader = torch.utils.data.DataLoader(
         training_dataset,
         batch_size=args.batch_size,
-        num_workers=4,
+        num_workers=2,
         shuffle=True
     )
 
     validation_dataloader = torch.utils.data.DataLoader(
         validation_dataset,
         batch_size=args.batch_size,
-        num_workers=4,
+        num_workers=2,
         shuffle=False
     )
 
@@ -103,8 +104,6 @@ def train(args):
         {'params': trainables_wo_bn, 'weight_decay': 0.0001},
         {'params': trainables_only_bn}
     ], lr=args.lr, momentum=0.9)
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     trainer = Trainer(
         optimizer,
@@ -132,20 +131,19 @@ def evaluate(args):
     dataset = LFWPairedDataset(
         dataset_dir, pairs_path, transform_for_infer(model_class.IMAGE_SHAPE))
 
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, num_workers=2)
     model = model_class(False).to(device)
 
     checkpoint = torch.load(args.evaluate)
     model.load_state_dict(checkpoint['state_dict'], strict=False)
     model.eval()
 
-
     embedings_a = torch.zeros(len(dataset), model.FEATURE_DIM)
     embedings_b = torch.zeros(len(dataset), model.FEATURE_DIM)
     matches = torch.zeros(len(dataset), dtype=torch.uint8)
 
-    for iteration, (images_a, images_b, batched_matches) \
-            in enumerate(dataloader):
+    for iteration, (images_a, images_b, batched_matches) in enumerate(dataloader):
+
         current_batch_size = len(batched_matches)
         images_a = images_a.to(device)
         images_b = images_b.to(device)
@@ -160,9 +158,9 @@ def evaluate(args):
         embedings_b[start:end, :] = batched_embedings_b.data
         matches[start:end] = batched_matches.data
 
-    thresholds = np.arange(0, 4, 0.1)
-    distances = torch.sum(torch.pow(embedings_a - embedings_b, 2), dim=1)
+    thresholds = np.arange(0, 4, 0.01)
 
+    distances = F.pairwise_distance(embedings_a, embedings_b)
     tpr, fpr, accuracy, best_thresholds = compute_roc(
         distances,
         matches,
@@ -205,10 +203,10 @@ if __name__ == '__main__':
                         help='input batch size for training (default: 256)')
     parser.add_argument('--log_dir', type=str,
                         help='log directory')
-    parser.add_argument('--epochs', type=int, default=100, metavar='N',
-                        help='number of epochs to train (default: 100)')
-    parser.add_argument('--lr', type=float, default=0.001,
-                        help='learning rate (default: 0.001)')
+    parser.add_argument('--epochs', type=int, default=120, metavar='N',
+                        help='number of epochs to train (default: 120)')
+    parser.add_argument('--lr', type=float, default=0.05,
+                        help='learning rate (default: 0.05)')
     parser.add_argument('--arch', type=str, default='resnet50',
                         help='network arch to use, support resnet18 and '
                              'resnet50 (default: resnet50)')

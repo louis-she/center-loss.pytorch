@@ -4,6 +4,7 @@ import tarfile
 from math import ceil, floor
 
 from torch.utils import data
+import cv2
 import numpy as np
 
 from utils import image_loader, download
@@ -13,8 +14,8 @@ PAIRS_TRAIN = "http://vis-www.cs.umass.edu/lfw/pairsDevTrain.txt"
 PAIRS_VAL = "http://vis-www.cs.umass.edu/lfw/pairsDevTest.txt"
 
 
-def create_datasets(dataroot, train_val_split=0.95,
-                    data_dir_name='lfw-deepfunneled'):
+def create_datasets(dataroot, train_val_split=1,
+                    data_dir_name='casia_maxpy_mtcnnpy_182'):
     if not os.path.isdir(dataroot):
         os.mkdir(dataroot)
 
@@ -98,6 +99,16 @@ class PairedDataset(data.Dataset):
 
 class LFWPairedDataset(PairedDataset):
 
+    def __getitem__(self, index):
+        image_a = self.loader(self.image_names_a[index])
+        image_b = self.loader(self.image_names_b[index])
+
+        return (
+            self.transform(image_a),
+            self.transform(image_b),
+            self.matches[index]
+        )
+
     def _prepare_dataset(self):
         pairs = self._read_pairs(self.pairs_cfg)
 
@@ -113,12 +124,12 @@ class LFWPairedDataset(PairedDataset):
                     pair[0], pair[2], int(pair[1]), int(pair[3])
 
             self.image_names_a.append(os.path.join(
-                    self.dataroot, 'lfw-deepfunneled',
-                    name1, "{}_{:04d}.jpg".format(name1, index1)))
+                    self.dataroot, 'lfw',
+                    name1, "{}_{:04d}.png".format(name1, index1)))
 
             self.image_names_b.append(os.path.join(
-                    self.dataroot, 'lfw-deepfunneled',
-                    name2, "{}_{:04d}.jpg".format(name2, index2)))
+                    self.dataroot, 'lfw',
+                    name2, "{}_{:04d}.png".format(name2, index2)))
             self.matches.append(match)
 
     def _read_pairs(self, pairs_filename):
